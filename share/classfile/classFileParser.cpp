@@ -5868,7 +5868,8 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   _transitive_interfaces = NULL;
   _local_interfaces = NULL;
 
-  // Initialize itable offset tables 初始化 itable
+  // Initialize itable offset tables 
+  // 初始化 itable
   klassItable::setup_itable_offset_table(ik);
 
   // Compute transitive closure of interfaces this class implements
@@ -5909,7 +5910,8 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   Handle module_handle(THREAD, module_entry->module());
 
   // Allocate mirror and initialize static fields
-  // The create_mirror() call will also call compute_modifiers() 分配 klass 对应的 java.lang.Class
+  // The create_mirror() call will also call compute_modifiers() 
+  // 分配 klass 对应的 java.lang.Class
   java_lang_Class::create_mirror(ik,
                                  Handle(THREAD, _loader_data->class_loader()),
                                  module_handle,

@@ -953,6 +953,7 @@ bool InstanceKlass::link_class_impl(TRAPS) {
     if (!is_linked()) {
       if (!is_rewritten()) {
         {
+          // 字节码验证
           bool verify_ok = verify_code(THREAD);
           if (!verify_ok) {
             return false;
@@ -967,14 +968,17 @@ bool InstanceKlass::link_class_impl(TRAPS) {
         }
 
         // also sets rewritten
+        // 字节码重写
         rewrite_class(CHECK_false);
       } else if (is_shared()) {
         SystemDictionaryShared::check_verification_constraints(this, CHECK_false);
       }
 
       // relocate jsrs and link methods after they are all rewritten
+      // 方法链接
       link_methods(CHECK_false);
 
+      // 初始化 vtable（虚表）和（接口表）
       // Initialize the vtable and interface table after
       // methods have been rewritten since rewrite may
       // fabricate new Method*s.
@@ -997,6 +1001,7 @@ bool InstanceKlass::link_class_impl(TRAPS) {
       // In case itable verification is ever added.
       // itable().verify(tty, true);
 #endif
+      // 链接完成
       set_init_state(linked);
       if (JvmtiExport::should_post_class_prepare()) {
         Thread *thread = THREAD;
@@ -1017,6 +1022,7 @@ void InstanceKlass::rewrite_class(TRAPS) {
     assert(is_shared(), "rewriting an unshared class?");
     return;
   }
+  // 重写
   Rewriter::rewrite(this, CHECK);
   set_rewritten();
 }
@@ -1393,6 +1399,7 @@ instanceOop InstanceKlass::register_finalizer(instanceOop i, TRAPS) {
   // Pass the handle as argument, JavaCalls::call expects oop as jobjects
   JavaValue result(T_VOID);
   JavaCallArguments args(h_i);
+  // 对应 java.lang.ref.Finalizer 的 register 方法
   methodHandle mh (THREAD, Universe::finalizer_register_method());
   JavaCalls::call(&result, mh, &args, CHECK_NULL);
   return h_i();

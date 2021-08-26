@@ -205,6 +205,8 @@ InstanceKlass* KlassFactory::create_from_stream(ClassFileStream* stream,
                          CHECK_NULL);
 
   const ClassInstanceInfo* cl_inst_info = cl_info.class_hidden_info_ptr();
+
+  // 得到 InstanceKlass 对象
   InstanceKlass* result = parser.create_instance_klass(old_stream != stream, *cl_inst_info, CHECK_NULL);
 
   if (result == NULL) {
