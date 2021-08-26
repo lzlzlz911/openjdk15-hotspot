@@ -5705,6 +5705,7 @@ InstanceKlass* ClassFileParser::create_instance_klass(bool changed_by_loadhook,
     return _klass;
   }
 
+  // 分配 InstanceKlass 所需内存
   InstanceKlass* const ik =
     InstanceKlass::allocate_instance_klass(*this, CHECK_NULL);
 
@@ -5712,6 +5713,7 @@ InstanceKlass* ClassFileParser::create_instance_klass(bool changed_by_loadhook,
     mangle_hidden_class_name(ik);
   }
 
+  // 使用 parse_stream() 得到的数据填充 InstanceKlass 的字段
   fill_instance_klass(ik, changed_by_loadhook, cl_inst_info, CHECK_NULL);
 
   assert(_klass == ik, "invariant");
@@ -5855,6 +5857,7 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
       (_super_klass != NULL && _super_klass->has_miranda_methods())
         // super class exists and this class inherited miranda methods
      ) {
+       // 如果引入了 miranda 方法，设置对应 flag
        ik->set_has_miranda_methods(); // then set a flag
   }
 
@@ -5865,11 +5868,12 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   _transitive_interfaces = NULL;
   _local_interfaces = NULL;
 
-  // Initialize itable offset tables
+  // Initialize itable offset tables 初始化 itable
   klassItable::setup_itable_offset_table(ik);
 
   // Compute transitive closure of interfaces this class implements
   // Do final class setup
+  // 初始化 OopMapBlock
   OopMapBlocksBuilder* oop_map_blocks = _field_info->oop_map_blocks;
   if (oop_map_blocks->_nonstatic_oop_map_count > 0) {
     oop_map_blocks->copy(ik->start_of_nonstatic_oop_maps());
@@ -5905,7 +5909,7 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   Handle module_handle(THREAD, module_entry->module());
 
   // Allocate mirror and initialize static fields
-  // The create_mirror() call will also call compute_modifiers()
+  // The create_mirror() call will also call compute_modifiers() 分配 klass 对应的 java.lang.Class
   java_lang_Class::create_mirror(ik,
                                  Handle(THREAD, _loader_data->class_loader()),
                                  module_handle,
@@ -5916,7 +5920,8 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   assert(_all_mirandas != NULL, "invariant");
 
   // Generate any default methods - default methods are public interface methods
-  // that have a default implementation.  This is new with Java 8.
+  // that have a default implementation.  This is new with Java 8. 
+  // 生成 Java8 的 default 方法
   if (_has_nonstatic_concrete_methods) {
     DefaultMethods::generate_default_methods(ik,
                                              _all_mirandas,
@@ -6283,7 +6288,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
                      "Incompatible magic value %u in class file %s",
                      magic, CHECK);
 
-  // Version numbers 读取 major/minor 版本号
+  // Version numbers 读取 major（副版本号）/minor（主版本号）
   _minor_version = stream->get_u2_fast();
   _major_version = stream->get_u2_fast();
 
@@ -6303,6 +6308,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
   verify_class_version(_major_version, _minor_version, _class_name, CHECK);
 
   stream->guarantee_more(3, CHECK); // length, first cp tag
+  //constant_pool_count 常量池计数器
   u2 cp_size = stream->get_u2_fast();
 
   guarantee_property(
@@ -6326,11 +6332,12 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
 
   ConstantPool* const cp = _cp;
 
+  //常量池
   parse_constant_pool(stream, cp, _orig_cp_size, CHECK);
 
   assert(cp_size == (const u2)cp->length(), "invariant");
 
-  // ACCESS FLAGS
+  // ACCESS FLAGS 访问标识
   stream->guarantee_more(8, CHECK);  // flags, this_class, super_class, infs_len
 
   // Access flags
@@ -6358,7 +6365,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
 
   _access_flags.set_flags(flags);
 
-  // This class and superclass
+  // This class and superclass 类索引 父类索引
   _this_class_index = stream->get_u2_fast();
   check_property(
     valid_cp_range(_this_class_index, cp_size) &&
@@ -6494,8 +6501,9 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
                                    _need_verify,
                                    CHECK);
 
-  // Interfaces
+  // Interfaces 接口计数器
   _itfs_len = stream->get_u2_fast();
+  // 接口表
   parse_interfaces(stream,
                    _itfs_len,
                    cp,
@@ -6506,6 +6514,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
 
   // Fields (offsets are filled in later)
   _fac = new FieldAllocationCount();
+  // 字段表
   parse_fields(stream,
                _access_flags.is_interface(),
                _fac,
@@ -6518,6 +6527,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
 
   // Methods
   AccessFlags promoted_flags;
+  // 方法表
   parse_methods(stream,
                 _access_flags.is_interface(),
                 &promoted_flags,
@@ -6536,6 +6546,7 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
 
   // Additional attributes/annotations
   _parsed_annotations = new ClassAnnotationCollector();
+  // 属性表
   parse_classfile_attributes(stream, cp, _parsed_annotations, CHECK);
 
   assert(_inner_classes != NULL, "invariant");

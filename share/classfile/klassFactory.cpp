@@ -196,6 +196,7 @@ InstanceKlass* KlassFactory::create_from_stream(ClassFileStream* stream,
                                         CHECK_NULL);
   }
 
+  // 解析类
   ClassFileParser parser(stream,
                          name,
                          loader_data,

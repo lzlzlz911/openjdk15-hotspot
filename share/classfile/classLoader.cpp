@@ -1271,6 +1271,7 @@ InstanceKlass* ClassLoader::load_class(Symbol* name, bool search_append_only, TR
   Handle protection_domain;
   ClassLoadInfo cl_info(protection_domain);
 
+  // 解析得到 InstanceKlass 对象
   InstanceKlass* result = KlassFactory::create_from_stream(stream,
                                                            name,
                                                            loader_data,
