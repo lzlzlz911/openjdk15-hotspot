@@ -625,6 +625,8 @@ AdapterHandlerEntry* SharedRuntime::generate_i2c2i_adapters(MacroAssembler *masm
                                                             const VMRegPair *regs,
                                                             AdapterFingerPrint* fingerprint) {
   address i2c_entry = __ pc();
+
+  // i2c adapter
   gen_i2c_adapter(masm, total_args_passed, comp_args_on_stack, sig_bt, regs);
 
   address c2i_unverified_entry = __ pc();
@@ -644,6 +646,7 @@ AdapterHandlerEntry* SharedRuntime::generate_i2c2i_adapters(MacroAssembler *masm
   __ jump(SharedRuntime::get_ic_miss_stub(), relocInfo::runtime_call_type, noreg, ne);
 
   address c2i_entry = __ pc();
+  // c2i adapter
   gen_c2i_adapter(masm, total_args_passed, comp_args_on_stack, sig_bt, regs, skip_fixup);
 
   __ flush();

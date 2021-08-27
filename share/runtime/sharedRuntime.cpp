@@ -2592,6 +2592,7 @@ AdapterHandlerEntry* AdapterHandlerLibrary::new_entry(AdapterFingerPrint* finger
 }
 
 AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter(const methodHandle& method) {
+  // 生成适配器
   AdapterHandlerEntry* entry = get_adapter0(method);
   if (entry != NULL && method->is_shared()) {
     // See comments around Method::link_method()
@@ -2616,6 +2617,7 @@ AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter(const methodHandle& meth
   return entry;
 }
 
+// 适配器
 AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter0(const methodHandle& method) {
   // Use customized signature handler.  Need to lock around updates to
   // the AdapterHandlerTable (it is not safe for concurrent readers
@@ -2689,6 +2691,7 @@ AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter0(const methodHandle& met
                                              sizeof(buffer_locs)/sizeof(relocInfo));
 
       MacroAssembler _masm(&buffer);
+      // 生成 i2c、c2i 适配器
       entry = SharedRuntime::generate_i2c2i_adapters(&_masm,
                                                      total_args_passed,
                                                      comp_args_on_stack,

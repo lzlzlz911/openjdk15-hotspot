@@ -1036,14 +1036,17 @@ void Method::set_not_osr_compilable(const char* reason, int comp_level, bool rep
 void Method::clear_code() {
   // this may be NULL if c2i adapters have not been made yet
   // Only should happen at allocate time.
+  // 清除 _from_compiled_entry，使其再次指向 c2i 适配器
   if (adapter() == NULL) {
     _from_compiled_entry    = NULL;
   } else {
     _from_compiled_entry    = adapter()->get_c2i_entry();
   }
   OrderAccess::storestore();
+  // 将 _from_interpreted_entry 再次指向解释器入口
   _from_interpreted_entry = _i2i_entry;
   OrderAccess::storestore();
+  // 取消指向机器代码
   _code = NULL;
 }
 
@@ -1176,6 +1179,7 @@ void Method::unlink_method() {
 void Method::link_method(const methodHandle& h_method, TRAPS) {
   // If the code cache is full, we may reenter this function for the
   // leftover methods that weren't linked.
+  // 如果是 CDS（Class Data Sharing）方法
   if (is_shared()) {
     // Can't assert that the adapters are sane, because methods get linked before
     // the interpreter is generated, and hence before its adapters are generated.
@@ -1191,8 +1195,10 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // Setup interpreter entrypoint
   assert(this == h_method(), "wrong h_method()" );
 
+  // 方法链接时，该方法肯定没有被编译（因为没有设置编译器入口）
   if (!is_shared()) {
     assert(adapter() == NULL, "init'd to NULL");
+    // 设置 _i2i_entry 和 _from_interpreted_entry 都指向解释器入口
     address entry = Interpreter::entry_for_method(h_method);
     assert(entry != NULL, "interpreter entry must be non-null");
     // Sets both _i2i_entry and _from_interpreted_entry
@@ -1214,6 +1220,7 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // called from the vtable.  We need adapters on such methods that get loaded
   // later.  Ditto for mega-morphic itable calls.  If this proves to be a
   // problem we'll make these lazily later.
+  // 设置 _from_compiled_entry 为 c2i 适配器入口
   (void) make_adapters(h_method, CHECK);
 
   // ONLY USE the h_method now as make_adapter may have blocked
@@ -1299,6 +1306,7 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   // These writes must happen in this order, because the interpreter will
   // directly jump to from_interpreted_entry which jumps to an i2c adapter
   // which jumps to _from_compiled_entry.
+  // 设置编译好的机器代码
   mh->_code = code;             // Assign before allowing compiled code to exec
 
   int comp_level = code->comp_level();
@@ -1309,6 +1317,7 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   }
 
   OrderAccess::storestore();
+  //设置解释器入口点为编译后的机器代码
   mh->_from_compiled_entry = code->verified_entry_point();
   OrderAccess::storestore();
   // Instantly compiled code can execute.
