@@ -1060,6 +1060,7 @@ void InstanceKlass::initialize_super_interfaces(TRAPS) {
   }
 }
 
+// 类初始化
 void InstanceKlass::initialize_impl(TRAPS) {
   HandleMark hm(THREAD);
 
@@ -1077,6 +1078,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
   // refer to the JVM book page 47 for description of steps
   // Step 1
   {
+    // 同步 C 的初始化锁 LC。这个操作会导致当前线程一直等待，知道可以获得 LC 锁。
     Handle h_init_lock(THREAD, init_lock());
     ObjectLocker ol(h_init_lock, THREAD, h_init_lock() != NULL);
 
@@ -1084,6 +1086,12 @@ void InstanceKlass::initialize_impl(TRAPS) {
     // If we were to use wait() instead of waitInterruptibly() then
     // we might end up throwing IE from link/symbol resolution sites
     // that aren't expected to throw.  This would wreak havoc.  See 6320309.
+
+    // 如果 C 的 Class 对象现实当前 C 的初始化是由其他线程正在进行的
+    // 那么当前线程就释放 LC 并进入阻塞状态
+    // 直到它知道初始化工作已经由其他线程完成
+    // 此时当前线程需要重试这一过程
+    // 执行初始化过程时，线程的中断状态不受影响
     while (is_being_initialized() && !is_reentrant_initialization(jt)) {
       wait = true;
       jt->set_class_to_be_initialized(this);
@@ -1092,18 +1100,27 @@ void InstanceKlass::initialize_impl(TRAPS) {
     }
 
     // Step 3
+    // 如果 C 的 Class 对象显示 C 的初始化正由当前线程进行
+    // 那就表明这是对初始化的递归请求
+    // 释放 LC 并正常返回
     if (is_being_initialized() && is_reentrant_initialization(jt)) {
       DTRACE_CLASSINIT_PROBE_WAIT(recursive, -1, wait);
       return;
     }
 
     // Step 4
+    // 如果 C 的 Class 对象显示 Class 已经初始化完成
+    // 那么就不需要再做什么了
+    // 释放 LC 并正常返回
     if (is_initialized()) {
       DTRACE_CLASSINIT_PROBE_WAIT(concurrent, -1, wait);
       return;
     }
 
     // Step 5
+    // 如果 C 的 Class 对象显示它处于一个错误的状态
+    // 那就不可能再完成初始化了
+    // 释放 LC 并抛出 NoClassDefFoundError 异常
     if (is_in_error_state()) {
       DTRACE_CLASSINIT_PROBE_WAIT(erroneous, -1, wait);
       ResourceMark rm(THREAD);
@@ -1121,6 +1138,10 @@ void InstanceKlass::initialize_impl(TRAPS) {
     }
 
     // Step 6
+    // 否则，记录下当前线程正在初始化 C 的 Class 对象
+    // 随后释放 LC
+    // 根据属性出现在 ClassFile 的顺序
+    // 利用 ConstantValue 属性来初始化 C 中的每个 final static 字段
     set_init_state(being_initialized);
     set_init_thread(jt);
   }
@@ -1128,6 +1149,9 @@ void InstanceKlass::initialize_impl(TRAPS) {
   // Step 7
   // Next, if C is a class rather than an interface, initialize it's super class and super
   // interfaces.
+  // 如果 C 是类而不是接口，且它的父类 SC 还没有初始化
+  // 那就在 SC 上面也递归地进行完整的初始化过程
+  // 当然，如果有必要，需要先验证和准备 SC
   if (!is_interface()) {
     Klass* super_klass = super();
     if (super_klass != NULL && super_klass->should_be_initialized()) {
@@ -1142,6 +1166,10 @@ void InstanceKlass::initialize_impl(TRAPS) {
     }
 
     // If any exceptions, complete abruptly, throwing the same exception as above.
+    // 如果在初始化 SC 的时候因为抛出异常而中断
+    // 那么就在获取 LC 后将 C 的 Class 对象标识为错误状态
+    // 并通知所有正在等待的县城，最后释放 LC 并异常退出
+    // 然后抛出与初始化 SC 时所遇异常相同的异常
     if (HAS_PENDING_EXCEPTION) {
       Handle e(THREAD, PENDING_EXCEPTION);
       CLEAR_PENDING_EXCEPTION;
@@ -1161,6 +1189,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
   AOTLoader::load_for_klass(this, THREAD);
 
   // Step 8
+  // 执行 C 的类或接口初始化方法
   {
     DTRACE_CLASSINIT_PROBE_WAIT(clinit, -1, wait);
     // Timer includes any side effects of class initialization (resolution,
@@ -1171,10 +1200,15 @@ void InstanceKlass::initialize_impl(TRAPS) {
                              jt->get_thread_stat()->perf_recursion_counts_addr(),
                              jt->get_thread_stat()->perf_timers_addr(),
                              PerfClassTraceTime::CLASS_CLINIT);
+
+    // 重点：初始化方法
     call_class_initializer(THREAD);
   }
 
   // Step 9
+  // 如果正常执行了类或接口的初始化方法，那就获取 LC
+  // 并把 C 的 Class 对象标成已经完全初始化，通知所有正在等待的线程
+  // 接着释放 LC，正常地退出整个过程
   if (!HAS_PENDING_EXCEPTION) {
     set_initialization_state_and_notify(fully_initialized, CHECK);
     {
@@ -1183,6 +1217,12 @@ void InstanceKlass::initialize_impl(TRAPS) {
   }
   else {
     // Step 10 and 11
+    // 否则，类或接口的初始化方法就必定因为抛出了一个异常 E 而中断退出
+    // 如果 E 不是 Error 或者它的某个子类
+    // 那就以 E 为参数来创建一个新的 ExceptionInInitializerError
+    // 并在之后的步骤中，用该实例来代替 E
+    // 如果因为 OutOfMemoryError 问题而不能创建 ExceptionInInitializerError
+    // 实例，那么在之后的步骤中使用 OutOfMemoryError 对象来代理 E
     Handle e(THREAD, PENDING_EXCEPTION);
     CLEAR_PENDING_EXCEPTION;
     // JVMTI has already reported the pending exception
@@ -1206,6 +1246,10 @@ void InstanceKlass::initialize_impl(TRAPS) {
                 &args);
     }
   }
+
+  // 获取 LC，标记下 C 的 Class 对象有错误发生
+  // 通知所有正在等待的线程，释放 LC
+  // 将 E 或上一步中的具体错误对象作为此次意外中断的原因
   DTRACE_CLASSINIT_PROBE_WAIT(end, -1, wait);
 }
 
@@ -1478,6 +1522,7 @@ Method* InstanceKlass::class_initializer() const {
 }
 
 void InstanceKlass::call_class_initializer(TRAPS) {
+  // 如果启用了编译重放则跳过初始化
   if (ReplayCompiles &&
       (ReplaySuppressInitializers == 1 ||
        (ReplaySuppressInitializers >= 2 && class_loader() != NULL))) {
@@ -1485,6 +1530,8 @@ void InstanceKlass::call_class_initializer(TRAPS) {
     return;
   }
 
+  // 获取初始化方法，包装成一个 methodHandle
+  // 调用class_initializer() 方法，该函数会返回当前类的 <clinit> 方法
   methodHandle h_method(THREAD, class_initializer());
   assert(!is_initialized(), "we cannot initialize twice");
   LogTarget(Info, class, init) lt;
@@ -1495,7 +1542,10 @@ void InstanceKlass::call_class_initializer(TRAPS) {
     name()->print_value_on(&ls);
     ls.print_cr("%s (" INTPTR_FORMAT ")", h_method() == NULL ? "(no method)" : "", p2i(this));
   }
+
+  // 调用初始化方法
   if (h_method() != NULL) {
+    // <clinit> 无参数
     JavaCallArguments args; // No arguments
     JavaValue result(T_VOID);
     JavaCalls::call(&result, h_method, &args, CHECK); // Static call (no args)
