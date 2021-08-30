@@ -101,9 +101,12 @@ ALWAYSINLINE void InstanceKlass::oop_oop_iterate_oop_map_bounded(OopMapBlock* ma
 
 template <typename T, class OopClosureType>
 ALWAYSINLINE void InstanceKlass::oop_oop_iterate_oop_maps(oop obj, OopClosureType* closure) {
+  // 获取开始 OopMapBlock
   OopMapBlock* map           = start_of_nonstatic_oop_maps();
+  // 获取结束 OopMapBlock
   OopMapBlock* const end_map = map + nonstatic_oop_map_count();
 
+  // 遍历每个 OopMapBlock
   for (; map < end_map; ++map) {
     oop_oop_iterate_oop_map<T>(map, obj, closure);
   }

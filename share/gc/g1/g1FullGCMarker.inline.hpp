@@ -129,11 +129,13 @@ void G1FullGCMarker::follow_array_chunk(objArrayOop array, int index) {
 
 inline void G1FullGCMarker::follow_object(oop obj) {
   assert(_bitmap->is_marked(obj), "should be marked");
+  // 如果对象是数组，则标记每个数组成员
   if (obj->is_objArray()) {
     // Handle object arrays explicitly to allow them to
     // be split into chunks if needed.
     follow_array((objArrayOop)obj);
   } else {
+    // 否则标记对象的每个非静态数据成员 -> instanceKlass.inline.cpp -> InstanceKlass::oop_oop_iterate_oop_maps()
     obj->oop_iterate(mark_closure());
     if (VerifyDuringGC) {
       if (obj->is_instance() && InstanceKlass::cast(obj->klass())->is_reference_instance_klass()) {
