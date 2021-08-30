@@ -185,6 +185,7 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
     return;
   }
 
+  // 复制 父类的 虚表
   int super_vtable_len = initialize_from_super(super);
   if (_klass->is_array_klass()) {
     assert(super_vtable_len == _length, "arrays shouldn't introduce new methods");
@@ -197,14 +198,17 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
 
     // Check each of this class's methods against super;
     // if override, replace in copy of super vtable, otherwise append to end
+    // 处理当前类的所有方法
     for (int i = 0; i < len; i++) {
       // update_inherited_vtable can stop for gc - ensure using handles
       HandleMark hm(THREAD);
       assert(methods->at(i)->is_method(), "must be a Method*");
       methodHandle mh(THREAD, methods->at(i));
 
+      // 该方法是否为虚方法
       bool needs_new_entry = update_inherited_vtable(ik(), mh, super_vtable_len, -1, checkconstraints, CHECK);
 
+      // 如果是，则需要更新当前类的虚表索引
       if (needs_new_entry) {
         put_method_at(mh(), initialized);
         mh()->set_vtable_index(initialized); // set primary vtable index
@@ -213,6 +217,7 @@ void klassVtable::initialize_vtable(bool checkconstraints, TRAPS) {
     }
 
     // update vtable with default_methods
+    // 处理 default 方法
     Array<Method*>* default_methods = ik()->default_methods();
     if (default_methods != NULL) {
       len = default_methods->length();

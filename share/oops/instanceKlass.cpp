@@ -998,6 +998,7 @@ bool InstanceKlass::link_class_impl(TRAPS) {
         need_init_table = false;
       }
       if (need_init_table) {
+        // 虚表初始化
         vtable().initialize_vtable(true, CHECK_false);
         itable().initialize_itable(true, CHECK_false);
       }
