@@ -69,6 +69,7 @@ inline HeapWord* CollectedHeap::align_allocation_or_fail(HeapWord* addr,
 
 inline oop CollectedHeap::obj_allocate(Klass* klass, int size, TRAPS) {
   ObjAllocator allocator(klass, size, THREAD);
+  // 创建对象
   return allocator.allocate();
 }
 

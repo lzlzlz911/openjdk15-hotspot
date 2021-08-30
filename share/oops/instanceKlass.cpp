@@ -483,6 +483,11 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
   InstanceKlass* ik;
 
   // Allocation
+  // 根据对象类型进行分配
+  // InstanceMirrorKlass
+  // InstanceClassLoaderKlass->java.lang.ClassLoader
+  // InstanceKlass
+  // InstanceRefKlass->java.lang.ref.Reference
   if (REF_NONE == parser.reference_type()) {
     if (class_name == vmSymbols::java_lang_Class()) {
       // mirror
@@ -1450,11 +1455,14 @@ instanceOop InstanceKlass::register_finalizer(instanceOop i, TRAPS) {
 }
 
 instanceOop InstanceKlass::allocate_instance(TRAPS) {
+  // 是否重写 finalizer 方法
   bool has_finalizer_flag = has_finalizer(); // Query before possible GC
+  // 获取对象大小
   int size = size_helper();  // Query before forming handle.
 
   instanceOop i;
 
+  // 在堆上分配对象
   i = (instanceOop)Universe::heap()->obj_allocate(this, size, CHECK_NULL);
   if (has_finalizer_flag && !RegisterFinalizersAtInit) {
     i = register_finalizer(i, CHECK_NULL);

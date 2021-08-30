@@ -360,8 +360,10 @@ oop MemAllocator::allocate() const {
   oop obj = NULL;
   {
     Allocation allocation(*this, &obj);
+    // 根据对象 size 分配一片内存
     HeapWord* mem = mem_allocate(allocation);
     if (mem != NULL) {
+      // 初始化对象头，initialize 会返回 oop(mem)
       obj = initialize(mem);
     } else {
       // The unhandled oop detector will poison local variable obj,
