@@ -484,10 +484,10 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
 
   // Allocation
   // 根据对象类型进行分配
-  // InstanceMirrorKlass
+  // InstanceMirrorKlass->java.lang.Class
   // InstanceClassLoaderKlass->java.lang.ClassLoader
-  // InstanceKlass
-  // InstanceRefKlass->java.lang.ref.Reference
+  // InstanceKlass->普通类
+  // InstanceRefKlass->java.lang.ref.*(Reference)
   if (REF_NONE == parser.reference_type()) {
     if (class_name == vmSymbols::java_lang_Class()) {
       // mirror
